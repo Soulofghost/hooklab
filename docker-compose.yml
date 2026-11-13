@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  hooklab:
+    build: .
+    container_name: hooklab-service
+    ports:
+      - "8000:8000"
+    environment:
+      - HOOKLAB_PORT=8000
+      - HOOKLAB_DB_PATH=backend/data/hooklab.db
+    volumes:
+      - hooklab-data:/app/backend/data
+    restart: unless-stopped
+
+volumes:
+  hooklab-data:

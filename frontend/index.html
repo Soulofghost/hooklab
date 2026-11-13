@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HookLab | Webhook Inspector, HMAC Verification & Delivery Replay</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-layout">
+    <header class="navbar">
+      <div class="nav-brand">
+        <div class="brand-hook">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+        </div>
+        <div>
+          <h2>HookLab</h2>
+          <span class="tagline">WEBHOOK INSPECTOR & REPLAY ENGINE</span>
+        </div>
+      </div>
+
+      <div class="nav-metrics">
+        <div class="metric-chip">
+          <span class="label">ENDPOINTS</span>
+          <span class="value" id="statEndpoints">0</span>
+        </div>
+        <div class="metric-chip">
+          <span class="label">CAPTURED EVENTS</span>
+          <span class="value" id="statEvents">0</span>
+        </div>
+        <div class="metric-chip">
+          <span class="label">VERIFIED HMAC</span>
+          <span class="value text-emerald" id="statVerified">0</span>
+        </div>
+        <button class="btn btn-primary" id="openEndpointModal">+ Provision Endpoint</button>
+      </div>
+    </header>
+
+    <main class="main-container">
+      <div class="hero-section">
+        <div>
+          <h1>Real-Time Webhook Debugger & HMAC Authenticator</h1>
+          <p class="subtitle">Dynamic HTTP listener endpoints, raw payload inspection, HMAC-SHA256 constant-time verification, and manual delivery replay execution.</p>
+        </div>
+      </div>
+
+      <!-- Endpoint Selector & Inbound URL Box -->
+      <div class="endpoint-bar">
+        <div class="field-inline">
+          <label>Active Endpoint:</label>
+          <select id="endpointSelect">
+            <option value="">Loading endpoints...</option>
+          </select>
+        </div>
+        <div class="url-copy-box">
+          <span class="url-label">Inbound URL:</span>
+          <code id="webhookUrlDisplay" class="text-mono">http://localhost:8000/webhook/...</code>
+          <button class="btn btn-secondary btn-sm" id="copyUrlBtn">📋 Copy</button>
+        </div>
+      </div>
+
+      <!-- Split Layout: Event List on Left, Event Inspector on Right -->
+      <div class="inspector-layout">
+        <!-- Event List -->
+        <div class="event-stream-card card">
+          <div class="card-header">
+            <h3>Captured Events</h3>
+            <button class="btn btn-sm btn-secondary" id="refreshEventsBtn">🔄 Refresh</button>
+          </div>
+          <div class="card-body p-0">
+            <div class="events-list" id="eventsList">
+              <div class="empty-state">No events captured yet. Send a webhook to the inbound URL above.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Event Detail Inspector -->
+        <div class="detail-card card">
+          <div class="card-header">
+            <h3>Payload & Header Inspector</h3>
+            <div class="header-actions">
+              <span class="badge" id="hmacBadge">SELECT AN EVENT</span>
+              <button class="btn btn-primary btn-sm" id="replayBtn" disabled>⚡ Replay Event</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="inspectorContent" style="display: none;">
+              <div class="meta-row">
+                <div><strong>Method:</strong> <span class="badge badge-info" id="detailMethod">POST</span></div>
+                <div><strong>Client IP:</strong> <code id="detailIp">127.0.0.1</code></div>
+                <div><strong>Timestamp:</strong> <span id="detailTime">--</span></div>
+              </div>
+
+              <h4 class="section-title" style="margin-top: 1.25rem;">HTTP Headers</h4>
+              <pre class="code-pre"><code id="detailHeaders">{}</code></pre>
+
+              <h4 class="section-title" style="margin-top: 1.25rem;">Raw Body (Payload)</h4>
+              <pre class="code-pre"><code id="detailBody">{}</code></pre>
+            </div>
+            <div id="inspectorPlaceholder" class="empty-state" style="padding: 4rem 2rem;">
+              Select a captured webhook event from the left sidebar to inspect payload and replay delivery.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Test Simulator Bar -->
+      <div class="card" style="margin-top: 1.75rem;">
+        <div class="card-header">
+          <h3>Test Webhook Simulator</h3>
+          <span class="badge badge-info">Generate Inbound Event</span>
+        </div>
+        <div class="card-body">
+          <div class="sim-row">
+            <input type="text" id="simPayloadInput" placeholder='{"event": "payment_intent.succeeded", "amount": 4900, "currency": "usd"}' value='{"event": "payment_intent.succeeded", "amount": 4900, "currency": "usd"}'>
+            <button class="btn btn-secondary" id="sendSimBtn">🚀 Fire Simulated Webhook</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal: Provision Endpoint -->
+  <div class="modal-overlay" id="endpointModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Provision New Webhook Endpoint</h3>
+        <button class="btn-close" id="closeEndpointBtn">&times;</button>
+      </div>
+      <form id="createEndpointForm">
+        <div class="field">
+          <label>Endpoint Label *</label>
+          <input type="text" id="epName" required placeholder="e.g. Stripe Checkout Ingest">
+        </div>
+        <div class="field">
+          <label>Signing Secret (HMAC-SHA256)</label>
+          <input type="text" id="epSecret" placeholder="Optional or auto-generated">
+        </div>
+        <div class="field">
+          <label>Default Replay URL</label>
+          <input type="text" id="epForward" placeholder="e.g. http://localhost:3000/api/webhooks">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="cancelEndpointBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Endpoint</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
